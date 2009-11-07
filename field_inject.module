@@ -10,6 +10,8 @@
  *  - generalized image_attach, to work with CCK noderef and any content type
  *  - CiviCRM-style collection of user data in other forms.
  *
+ * How it works:
+ *
  *
  * Some terminology: 
  *  - donor form: the form whose elements are being inserted into another form
@@ -53,8 +55,18 @@ function field_inject_menu() {
 /**
  * Implementation of hook_form_alter().
  *
- * Nomenclature: foo_form is ids, form_foo is form data???
- * Hideous var names. fixme!
+ * Inject donor form elements into recipient forms. 
+ * We come here several times, it gets complicated!
+ * The first time is the regular form alteration for the recipient form.
+ * If the form is indeed a canditate recipient, then we build the donor form --
+ * this sets in motion another chain of form building, which brings us here, in 
+ * a nested second pass.
+ * We detect this second pass with a static variable an, hand over to a 
+ * helper function that grabs the form elements we want from the donor and 
+ * builds up an array suitable for inserting into the recipient.
+ * This is stored as a static variable, whereupon we return.
+ * Meanwhile, back at the first pass ranch, the second pass form building 
+ * is done, and we can now get the donor elements from the static variable.
  */
 function field_inject_form_alter(&$form, $form_state, $form_id) {
   dsm("HFA: $form_id ====================");
@@ -117,13 +129,10 @@ function field_inject_form_alter(&$form, $form_state, $form_id) {
       $donor_form = array();
      
       dsm($form);
-      
-      //dsm($inject_form);
-      foreach ($injection['inject elements'] as $injection_piece) {
-        //$inject_form = drupal
-      }
     }
-    // MUST CLEAR STATIC HERE and reset HFA to normal
+    // Clear static data here so hook_form_alter() is back to normal,
+    // should another form later this page load be a recipient.
+    $donor_forms_data = array();
   }
 
 
@@ -148,8 +157,9 @@ function field_inject_form_alter_donor_form(&$form, $form_state, $form_id, $inje
     $donor_form_base_key = $injection['id'] . '_' . $id;
     $donor_form[$donor_form_base_key] = array(
       '#type' => 'fieldset',
-      '#title' => t('GAH?'),
-      '#weight' => $donor_elements_set['weight'],
+      // todo: nice programmatic way of getting these in with defaults if not set by settings
+      '#title' => $donor_elements_set['#title'],
+      '#weight' => $donor_elements_set['#weight'],
       '#tree' => TRUE,
       '#collapsible' => TRUE,
       '#collapsed' => FALSE,
@@ -247,8 +257,9 @@ function field_inject_injections() {
       ),
       'donor elements' => array( // set of injections for this
         'image' => array(
+          '#title' => 'Attached image',
+          '#weight' => 10,
           'after' => '',
-          'weight' => 10,
           // @todo: allows description, etc. basically, make this array formAPI-style data
           'elements' => array('title', 'image'),
           // @todo: specify callback to alter these elements,
@@ -263,17 +274,18 @@ function field_inject_injections() {
       // some forms need to be obtained with a wrapper around drupal_get_form,
       // such as node add forms!
       // BEWARE: form id and node_add() arguments differ by -/_!!!
-      'donor form id'  => 'project_project_node_form',
+      'donor form id'  => 'group_node_form',
       'donor form callback'  => 'node_add', // @TODO defaults to drupal_get_form
-      'donor form arguments' => array('project-project'),
+      'donor form arguments' => array('group'),
       'remove' => array(
         'FORM element iD!' => '', // ??? need to say a value to put into the removed item.
         // fixed? from other element? from submission result? callback!!
       ),
       'donor elements' => array( // set of injections for this
         'project' => array(
+          '#title' => 'Related grouping',
+          '#weight' => 10,
           'after' => '',
-          'weight' => 10,
           // @todo: allows description, etc. basically, make this array formAPI-style data
           'elements' => array('title'),
           // @todo: specify callback to alter these elements,
