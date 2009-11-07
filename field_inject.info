@@ -1,0 +1,4 @@
+; $Id$
+name = Field_inject
+description = TODO: Description of module
+core = 6.x

@@ -1,0 +1,152 @@
+<?php
+// $Id$
+/**
+ * @file field_inject.module
+ * TODO: Enter file description here.
+ *
+ * Some terminology: 
+ *  - injected form: the form whose elements are being injected into another form
+ *  - recipient form: the form the user sees with extra elements from the injected form
+ *
+ * One recipient form can be the subject of several injections (say by differnet modules!)
+ * Each injection can inject several forms
+ * Each injected form should only get mentioned once though! could lead to data clashes!?!?!
+ */
+
+/**
+ * Implementation of hook_menu().
+ */
+function field_inject_menu() { 
+  // This is the minimum information you can provide for a menu item.
+  $items['TODO: Enter path'] = array(
+    'title' => 'TODO: Enter menu item title',
+    'page callback' => 'TODO: Enter callback function',
+    'access arguments' => array('TODO: Enter user permissions'),
+  );
+  // more complex menu item
+  $items['TODO: Enter path'] = array(
+    'title' => 'TODO: Enter menu item title',
+    'description' => 'TODO: Enter description',
+    'page callback' => 'TODO: Enter callback function',
+    'page arguments' => '', // An array of arguments to pass to the page callback function. Integer values pass the corresponding URL component.
+    'access callback' => '', // defaults to user_access()
+    'access arguments' => array('TODO: Enter user permissions'),
+    'weight' => 0,
+    'type' => MENU_NORMAL_ITEM, // One of MENU_NORMAL_ITEM / MENU_CALLBACK / MENU_SUGGESTED_ITEM / MENU_LOCAL_TASK / MENU_DEFAULT_LOCAL_TASK
+    'menu_name' => '', // Menu to place this item in.
+    'title callback' => '', // Function to generate the title, defaults to t(). 
+    'title arguments' => '', // Arguments to send to t() or your custom callback. 
+  );
+  // OPTIONAL: Fill in additional static menu items
+
+  return $items;
+}
+
+
+/**
+ * Implementation of hook_form_alter().
+ */
+function field_inject_form_alter(&$form, $form_state, $form_id) {
+  dsm("HFA: $form_id ====================");
+
+  static $injected_forms = array();  
+  //$injected_forms = array();
+  
+  dsm($injected_forms, 'injected forms'); // fail
+  //dsm("static: $injected_form"); // works!
+  //dsm("FOO: $foo");
+   
+  if (in_array($form_id, $injected_forms)) {
+    // 2nd time around for this injection:
+    // we are altering the injected form
+    //dsm('2nd');
+    field_inject_form_alter_injected_form($form, $form_state, $form_id);
+    //dsm("static: $foo");
+    
+    // then 
+  }
+  
+  $injections = field_inject_injections();
+  foreach ($injections as $key => $injection) {
+    if (in_array($form_id, $injection['recipient forms'])) {
+      dsm('inject: --'); 
+      dsm($injection);
+      dsm($form);
+      
+      //$injected_form = 'WIBBLE';
+      //$foo = 'FOO!';
+      //$inject_form = drupal_get_form($injection['injected form']);
+      
+      // set statics
+      $injected_forms['injected form id'] = $injection;
+      // call the form to embed
+      $inject_form = call_user_func_array($injection['injected form callback'], $injection['injected form arguments']);
+      // @todo HALP doesn't work. WTF?
+      // fallback on scalar
+      $injected_form = $injection['injected form id'];
+     
+      
+      
+      //dsm($inject_form);
+      foreach ($injection['inject'] as $injection_piece) {
+        //$inject_form = drupal
+      }
+    }
+    // MUST CLEAR STATIC HERE and reset HFA to normal
+  }
+
+
+}
+
+function field_inject_form_alter_injected_form(&$form, $form_state, $form_id) {
+  // need the injection data here!
+  dsm($form);
+  
+}
+
+
+function php_static_recursive() {
+  static $foo;  
+  
+  
+}
+
+
+/**
+ * Return settings data.
+ */
+function field_inject_injections() {
+  $data = array(
+    // An injection set: things from one form to be injected in another (or
+    // several).
+    'mykey' => array( // unique key, prefix with your module name for safety!
+      'recipient forms' => array('story_node_form'), // array of form IDs
+      // nope, needs to be callback to hit all node forms, say!
+      
+      // some forms need to be obtained with a wrapper around drupal_get_form,
+      // such as node add forms!
+      'injected form id'  => 'image_node_form',
+      'injected form callback'  => 'node_add', // TODO defaults to drupal_get_form
+      'injected form arguments' => array('image'),  
+     'remove' => array(
+        'FORM element iD!' => '', // ??? need to say a value to put into the removed item.
+        // fixed? from other element? from submission result? callback!!
+      ),
+      'inject' => array( // set of injections for this for
+        'myid' => array(
+          'after' => '',
+          'weight' => 10,
+          'elements' => '',
+        ),
+      ),
+    ),
+  );  
+  return $data;
+  
+  
+  
+}
+
+
+// isnodeform
+//   if (isset($form['type']) && isset($form['#node']) && $form['type']['#value'] .'_node_form' == $form_id) {
