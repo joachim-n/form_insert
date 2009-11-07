@@ -61,7 +61,7 @@ function field_inject_form_alter(&$form, $form_state, $form_id) {
     // 2nd time around for this injection:
     // we are altering the injected form
     //dsm('2nd');
-    field_inject_form_alter_injected_form($form, $form_state, $form_id, $injected_forms[$form_id]);
+    $form_inject = field_inject_form_alter_injected_form($form, $form_state, $form_id, $injected_forms[$form_id]);
     //dsm("static: $foo");
     
     // then 
@@ -106,12 +106,12 @@ function field_inject_form_alter_injected_form(&$form, $form_state, $form_id, $i
   //dsm($form);
   //dsm($injection);
   
-  $injected_form = array();
+  $form_inject = array();
   // Iterate over several sets of injections
   foreach ($injection['inject elements'] as $id => $inject_elements_set) {
     // Create a safe key (we hope!) to prevent clobbering in the recipient form.
     $injected_form_base_key = $injection['id'] . '_' . $id;
-    $injected_form[$injected_form_base_key] = array(
+    $form_inject[$injected_form_base_key] = array(
       '#type' => 'fieldset',
       '#title' => t('GAH?'),
       '#weight' => $inject_elements_set['weight'],
@@ -122,13 +122,13 @@ function field_inject_form_alter_injected_form(&$form, $form_state, $form_id, $i
     foreach ($inject_elements_set['elements'] as $element_id) {
       //dsm($element_id);
       //dsm($form[$element_id]);
-      $injected_form[$injected_form_base_key][$injected_form_base_key . '_' . $element_id] = $form[$element_id];
+      $form_inject[$injected_form_base_key][$injected_form_base_key . '_' . $element_id] = $form[$element_id];
     }
   }
   
-  dsm($injected_form);
+  dsm($form_inject);
   
-  return $injected_form;
+  return $form_inject;
 }
 
 
