@@ -56,7 +56,7 @@ function field_inject_form_alter(&$form, $form_state, $form_id) {
   //dsm("static: $injected_form"); // works!
   //dsm("FOO: $foo");
    
-  if (in_array($form_id, $injected_forms)) {
+  if (isset($injected_forms[$form_id])) {
     // 2nd time around for this injection:
     // we are altering the injected form
     //dsm('2nd');
@@ -78,7 +78,7 @@ function field_inject_form_alter(&$form, $form_state, $form_id) {
       //$inject_form = drupal_get_form($injection['injected form']);
       
       // set statics
-      $injected_forms['injected form id'] = $injection;
+      $injected_forms[$injection['injected form id']] = $injection;
       // call the form to embed
       $inject_form = call_user_func_array($injection['injected form callback'], $injection['injected form arguments']);
       // @todo HALP doesn't work. WTF?
