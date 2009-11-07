@@ -50,9 +50,10 @@ function field_inject_form_alter(&$form, $form_state, $form_id) {
   dsm("HFA: $form_id ====================");
 
   static $injected_forms = array();  
-  //$injected_forms = array();
+  // This allows us to detect the second time we come here when we are altering
+  // the injected form.
   
-  dsm($injected_forms, 'injected forms'); // fail
+  dsm($injected_forms, 'injected forms');
   //dsm("static: $injected_form"); // works!
   //dsm("FOO: $foo");
    
@@ -67,7 +68,7 @@ function field_inject_form_alter(&$form, $form_state, $form_id) {
   }
   
   $injections = field_inject_injections();
-  foreach ($injections as $key => $injection) {
+  foreach ($injections as $id => $injection) {
     if (in_array($form_id, $injection['recipient forms'])) {
       dsm('inject: --'); 
       dsm($injection);
@@ -78,6 +79,7 @@ function field_inject_form_alter(&$form, $form_state, $form_id) {
       //$inject_form = drupal_get_form($injection['injected form']);
       
       // set statics
+      $injection['id'] = $id;
       $injected_forms[$injection['injected form id']] = $injection;
       // call the form to embed
       $inject_form = call_user_func_array($injection['injected form callback'], $injection['injected form arguments']);
@@ -88,7 +90,7 @@ function field_inject_form_alter(&$form, $form_state, $form_id) {
       
       
       //dsm($inject_form);
-      foreach ($injection['inject'] as $injection_piece) {
+      foreach ($injection['inject elements'] as $injection_piece) {
         //$inject_form = drupal
       }
     }
@@ -98,11 +100,35 @@ function field_inject_form_alter(&$form, $form_state, $form_id) {
 
 }
 
+///////
 function field_inject_form_alter_injected_form(&$form, $form_state, $form_id, $injection) {
   // need the injection data here!
-  dsm($form);
-  dsm($injection);
+  //dsm($form);
+  //dsm($injection);
   
+  $injected_form = array();
+  // Iterate over several sets of injections
+  foreach ($injection['inject elements'] as $id => $inject_elements_set) {
+    // Create a safe key (we hope!) to prevent clobbering in the recipient form.
+    $injected_form_base_key = $injection['id'] . '_' . $id;
+    $injected_form[$injected_form_base_key] = array(
+      '#type' => 'fieldset',
+      '#title' => t('GAH?'),
+      '#weight' => $inject_elements_set['weight'],
+      '#collapsible' => TRUE,
+      '#collapsed' => FALSE,
+    );
+    // Iterate over the elements we have to inject.
+    foreach ($inject_elements_set['elements'] as $element_id) {
+      //dsm($element_id);
+      //dsm($form[$element_id]);
+      $injected_form[$injected_form_base_key][$injected_form_base_key . '_' . $element_id] = $form[$element_id];
+    }
+  }
+  
+  dsm($injected_form);
+  
+  return $injected_form;
 }
 
 
@@ -120,7 +146,7 @@ function field_inject_injections() {
   $data = array(
     // An injection set: things from one form to be injected in another (or
     // several).
-    'mykey' => array( // unique key, prefix with your module name for safety!
+    'image_attach' => array( // unique key, prefix with your module name for safety!
       'recipient forms' => array('story_node_form'), // array of form IDs
       // nope, needs to be callback to hit all node forms, say!
       
@@ -133,11 +159,12 @@ function field_inject_injections() {
         'FORM element iD!' => '', // ??? need to say a value to put into the removed item.
         // fixed? from other element? from submission result? callback!!
       ),
-      'inject' => array( // set of injections for this for
-        'myid' => array(
+      'inject elements' => array( // set of injections for this
+        'image' => array(
           'after' => '',
           'weight' => 10,
-          'elements' => '',
+          // @todo: allos description, etc. basically, make this array formAPI-style data
+          'elements' => array('title', 'image'),
         ),
       ),
     ),
