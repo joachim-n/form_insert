@@ -45,25 +45,32 @@ function field_inject_menu() {
 
 /**
  * Implementation of hook_form_alter().
+ *
+ * Nomenclature: foo_form is ids, form_foo is form data???
+ * Hideous var names. fixme!
  */
 function field_inject_form_alter(&$form, $form_state, $form_id) {
   dsm("HFA: $form_id ====================");
 
-  static $injected_forms = array();  
+  static $injected_forms_data = array();
+  static $form_inject    = array();
   // This allows us to detect the second time we come here when we are altering
   // the injected form.
   
-  dsm($injected_forms, 'injected forms');
+  dsm($injected_forms_data, 'injected forms');
   //dsm("static: $injected_form"); // works!
   //dsm("FOO: $foo");
-   
-  if (isset($injected_forms[$form_id])) {
+  
+  // Second pass:
+  if (isset($injected_forms_data[$form_id])) {
     // 2nd time around for this injection:
     // we are altering the injected form
     //dsm('2nd');
-    $form_inject = field_inject_form_alter_injected_form($form, $form_state, $form_id, $injected_forms[$form_id]);
+    // Build up the parts we want to inject, stash them in the $form and get out of here
+    // so we return to the 1st pass.
+    $form_inject = field_inject_form_alter_injected_form($form, $form_state, $form_id, $injected_forms_data[$form_id]);
+    return;
     //dsm("static: $foo");
-    
     // then 
   }
   
@@ -80,14 +87,21 @@ function field_inject_form_alter(&$form, $form_state, $form_id) {
       
       // set statics
       $injection['id'] = $id;
-      $injected_forms[$injection['injected form id']] = $injection;
-      // call the form to embed
-      $inject_form = call_user_func_array($injection['injected form callback'], $injection['injected form arguments']);
-      // @todo HALP doesn't work. WTF?
-      // fallback on scalar
-      $injected_form = $injection['injected form id'];
-     
+      $injected_forms_data[$injection['injected form id']] = $injection;
       
+      // Call the form to embed
+      // This sets in motion a whole new form building process which includes
+      // another visit to field_inject_form_alter(): see second pass above.
+      call_user_func_array($injection['injected form callback'], $injection['injected form arguments']);
+      
+      // Static $form_inject now holds the elements of the injected form we want.
+      // These are in weighted fieldsets.
+      // Inject the form element fieldsets into the recipient form.
+      $form = array_merge($form, $form_inject);
+      // Clear the static in case there are subsequent injections for this recipient.
+      $form_inject = array();
+     
+      dsm($form);
       
       //dsm($inject_form);
       foreach ($injection['inject elements'] as $injection_piece) {
@@ -100,7 +114,7 @@ function field_inject_form_alter(&$form, $form_state, $form_id) {
 
 }
 
-///////
+/////// builds up everything from the injected form.
 function field_inject_form_alter_injected_form(&$form, $form_state, $form_id, $injection) {
   // need the injection data here!
   //dsm($form);
@@ -117,6 +131,11 @@ function field_inject_form_alter_injected_form(&$form, $form_state, $form_id, $i
       '#weight' => $inject_elements_set['weight'],
       '#collapsible' => TRUE,
       '#collapsed' => FALSE,
+      '#element_validate' => 'field_inject_injection_validate',
+      'validate parameters' => array(
+        '#type' => 'value', 
+        '#value' => array('bar'),
+      ),
     );
     // Iterate over the elements we have to inject.
     foreach ($inject_elements_set['elements'] as $element_id) {
@@ -126,8 +145,10 @@ function field_inject_form_alter_injected_form(&$form, $form_state, $form_id, $i
     }
   }
   
-  dsm($form_inject);
+  //dsm($form_inject);
   
+  // ???
+  //$form['injectables'] = $form_inject;
   return $form_inject;
 }
 
@@ -143,6 +164,8 @@ function php_static_recursive() {
  * Return settings data.
  */
 function field_inject_injections() {
+  // This is an example for development purposes.
+  // This function should ultimately return data defined by implementing modules.
   $data = array(
     // An injection set: things from one form to be injected in another (or
     // several).
@@ -163,8 +186,10 @@ function field_inject_injections() {
         'image' => array(
           'after' => '',
           'weight' => 10,
-          // @todo: allos description, etc. basically, make this array formAPI-style data
+          // @todo: allows description, etc. basically, make this array formAPI-style data
           'elements' => array('title', 'image'),
+          // @todo: specify callback to alter these elements, eg for image attach,
+          // 'title' becomes 'Image title'.
         ),
       ),
     ),
