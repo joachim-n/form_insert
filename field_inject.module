@@ -123,13 +123,14 @@ function field_inject_form_alter(&$form, $form_state, $form_id) {
       // These are in weighted fieldsets.
       // Inject the form element fieldsets into the recipient form.
       $form = array_merge($form, $donor_form);
-      // Add our submit handler
-      $form['#submit'][] = 'field_inject_injection_submit';
       // Clear the static in case there are subsequent injections for this recipient.
       $donor_form = array();
      
       dsm($form);
     }
+    // Add our submit handler, just once for all insertions.
+    $form['#submit'][] = 'field_inject_injection_submit';
+    
     // Clear static data here so hook_form_alter() is back to normal,
     // should another form later this page load be a recipient.
     $donor_forms_data = array();
