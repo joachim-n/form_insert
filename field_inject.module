@@ -129,21 +129,27 @@ function field_inject_form_alter(&$form, $form_state, $form_id) {
 
 }
 
-/////// builds up everything from the donor form.
+/**
+ * Build up the donor form.
+ *
+ * We come here from the second pass at hook_form_alter, when we are altering
+ * the donor form. This gives us access to its structure array, which we plunder
+ * for the bits we need.
+ */
 function field_inject_form_alter_donor_form(&$form, $form_state, $form_id, $injection) {
   // need the injection data here!
-  //dsm($form);
-  //dsm($injection);
+  dsm($form);
+  dsm($injection);
   
   $donor_form = array();
   // Iterate over several sets of injections
-  foreach ($injection['inject elements'] as $id => $inject_elements_set) {
+  foreach ($injection['donor elements'] as $id => $donor_elements_set) {
     // Create a safe key (we hope!) to prevent clobbering in the recipient form.
     $donor_form_base_key = $injection['id'] . '_' . $id;
     $donor_form[$donor_form_base_key] = array(
       '#type' => 'fieldset',
       '#title' => t('GAH?'),
-      '#weight' => $inject_elements_set['weight'],
+      '#weight' => $donor_elements_set['weight'],
       '#tree' => TRUE,
       '#collapsible' => TRUE,
       '#collapsed' => FALSE,
@@ -159,8 +165,8 @@ function field_inject_form_alter_donor_form(&$form, $form_state, $form_id, $inje
       ),
     );
     // Iterate over the elements we have to inject.
-    foreach ($inject_elements_set['elements'] as $element_id) {
-      //dsm($element_id);
+    foreach ($donor_elements_set['elements'] as $element_id) {
+      dsm("donor element id: $element_id");
       //dsm($form[$element_id]);
       $donor_form[$donor_form_base_key][$donor_form_base_key . '_' . $element_id] = $form[$element_id];
       // @todo altering callback
@@ -239,7 +245,7 @@ function field_inject_injections() {
         'FORM element iD!' => '', // ??? need to say a value to put into the removed item.
         // fixed? from other element? from submission result? callback!!
       ),
-      'inject elements' => array( // set of injections for this
+      'donor elements' => array( // set of injections for this
         'image' => array(
           'after' => '',
           'weight' => 10,
@@ -264,7 +270,7 @@ function field_inject_injections() {
         'FORM element iD!' => '', // ??? need to say a value to put into the removed item.
         // fixed? from other element? from submission result? callback!!
       ),
-      'inject elements' => array( // set of injections for this
+      'donor elements' => array( // set of injections for this
         'project' => array(
           'after' => '',
           'weight' => 10,
