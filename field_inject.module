@@ -4,6 +4,13 @@
  * @file field_inject.module
  * TODO: Enter file description here.
  *
+ * Framework to allow modules to cause fields from one form to be included inside another.
+ *
+ * Use cases:
+ *  - generalized image_attach, to work with CCK noderef and any content type
+ *  - CiviCRM-style collection of user data in other forms.
+ *
+ *
  * Some terminology: 
  *  - injected form: the form whose elements are being injected into another form
  *  - recipient form: the form the user sees with extra elements from the injected form
@@ -39,7 +46,7 @@ function field_inject_menu() {
   );
   // OPTIONAL: Fill in additional static menu items
 
-  return $items;
+  //return $items;
 }
 
 
@@ -57,15 +64,18 @@ function field_inject_form_alter(&$form, $form_state, $form_id) {
   // This allows us to detect the second time we come here when we are altering
   // the injected form.
   
+  dsm("2nd pass checks: $form_id");
   dsm($injected_forms_data, 'injected forms');
   //dsm("static: $injected_form"); // works!
   //dsm("FOO: $foo");
   
-  // Second pass:
+  /**
+   * Second pass: check to see if we've come here for a donor form.
+   */
   if (isset($injected_forms_data[$form_id])) {
     // 2nd time around for this injection:
     // we are altering the injected form
-    //dsm('2nd');
+    dsm('2nd pass');
     // Build up the parts we want to inject, stash them in the $form and get out of here
     // so we return to the 1st pass.
     $form_inject = field_inject_form_alter_injected_form($form, $form_state, $form_id, $injected_forms_data[$form_id]);
@@ -75,9 +85,10 @@ function field_inject_form_alter(&$form, $form_state, $form_id) {
   }
   
   $injections = field_inject_injections();
+  // @todo stash title! forms try to change it!
   foreach ($injections as $id => $injection) {
     if (in_array($form_id, $injection['recipient forms'])) {
-      dsm('inject: --'); 
+      dsm("inject: $form_id - $id ============="); 
       dsm($injection);
       dsm($form);
       
@@ -87,17 +98,21 @@ function field_inject_form_alter(&$form, $form_state, $form_id) {
       
       // set statics
       $injection['id'] = $id;
-      $injected_forms_data[$injection['injected form id']] = $injection;
+      $injected_forms_data[$injection['donor form id']] = $injection;
+      
+      dsm($injected_forms_data);
       
       // Call the form to embed
       // This sets in motion a whole new form building process which includes
       // another visit to field_inject_form_alter(): see second pass above.
-      call_user_func_array($injection['injected form callback'], $injection['injected form arguments']);
+      call_user_func_array($injection['donor form callback'], $injection['donor form arguments']);
       
       // Static $form_inject now holds the elements of the injected form we want.
       // These are in weighted fieldsets.
       // Inject the form element fieldsets into the recipient form.
       $form = array_merge($form, $form_inject);
+      // Add our submit handler
+      $form['#submit'][] = 'field_inject_injection_submit';
       // Clear the static in case there are subsequent injections for this recipient.
       $form_inject = array();
      
@@ -129,12 +144,22 @@ function field_inject_form_alter_injected_form(&$form, $form_state, $form_id, $i
       '#type' => 'fieldset',
       '#title' => t('GAH?'),
       '#weight' => $inject_elements_set['weight'],
+      '#tree' => TRUE,
       '#collapsible' => TRUE,
       '#collapsed' => FALSE,
-      '#element_validate' => 'field_inject_injection_validate',
+      '#element_validate' => array('field_inject_injection_validate'),
+      '#element_submit' => array('field_inject_injection_validate'), /// ??
       'validate parameters' => array(
         '#type' => 'value', 
         '#value' => array('bar'),
+      ),
+      'injected form' => array(
+        '#type' => 'value', 
+        '#value' => serialize($form),
+      ),
+      'injected form array' => array(
+        '#type' => 'value', 
+        '#value' => $form,
       ),
     );
     // Iterate over the elements we have to inject.
@@ -142,6 +167,7 @@ function field_inject_form_alter_injected_form(&$form, $form_state, $form_id, $i
       //dsm($element_id);
       //dsm($form[$element_id]);
       $form_inject[$injected_form_base_key][$injected_form_base_key . '_' . $element_id] = $form[$element_id];
+      // @todo altering callback
     }
   }
   
@@ -153,10 +179,45 @@ function field_inject_form_alter_injected_form(&$form, $form_state, $form_id, $i
 }
 
 
-function php_static_recursive() {
-  static $foo;  
+/**
+ * Validation for all recipient forms.
+ *
+ * When we get here we have already been through basic form validation
+ * eg, #required fields.
+ */
+function field_inject_injection_validate($element, &$form_state) {
+  // For now, just return, as the basic case #required is handled.
+  dsm($element);
+  dsm($form_state);
+  return;
+
+  dsm('our validate');
+  dsm(form_get_errors());
+ 
+  // #required works
+  // injected forms that have their own validation
+  // will need this function to fiddle with form errors:
+  //  - stash form_get_errors()
+  //  - clear all form errors
+  //  - run the injected form's validation, somehow!?!?!?!
+  //  - get form errors
+  //  - prefix the form IDs
+  //  - clear form errors again
+  //  - merge with our stash and re-set them all
+}
+
+function field_inject_injection_submit($element, &$form_state) {
+  dsm('our submit');
+  dsm(form_get_errors());
+  dsm($element);
+  dsm($form_state);  
   
-  
+  // need to:
+  // get hold of the injected form somehow
+  // insert defaults or calculated values
+  // translate our form values into the original names
+  // build a form state
+  // call the submit handler
 }
 
 
@@ -175,10 +236,10 @@ function field_inject_injections() {
       
       // some forms need to be obtained with a wrapper around drupal_get_form,
       // such as node add forms!
-      'injected form id'  => 'image_node_form',
-      'injected form callback'  => 'node_add', // TODO defaults to drupal_get_form
-      'injected form arguments' => array('image'),  
-     'remove' => array(
+      'donor form id'  => 'image_node_form',
+      'donor form callback'  => 'node_add', // TODO defaults to drupal_get_form
+      'donor form arguments' => array('image'),  
+      'remove' => array(
         'FORM element iD!' => '', // ??? need to say a value to put into the removed item.
         // fixed? from other element? from submission result? callback!!
       ),
@@ -188,8 +249,33 @@ function field_inject_injections() {
           'weight' => 10,
           // @todo: allows description, etc. basically, make this array formAPI-style data
           'elements' => array('title', 'image'),
-          // @todo: specify callback to alter these elements, eg for image attach,
-          // 'title' becomes 'Image title'.
+          // @todo: specify callback to alter these elements,
+          //  eg for image attach, 'title' becomes 'Image title'.
+        ),
+      ),
+    ),
+    'cck_noderef' => array( // unique key, prefix with your module name for safety!
+      'recipient forms' => array('story_node_form'), // array of form IDs
+      // nope, needs to be callback to hit all node forms, say!
+      
+      // some forms need to be obtained with a wrapper around drupal_get_form,
+      // such as node add forms!
+      // BEWARE: form id and node_add() arguments differ by -/_!!!
+      'donor form id'  => 'project_project_node_form',
+      'donor form callback'  => 'node_add', // @TODO defaults to drupal_get_form
+      'donor form arguments' => array('project-project'),
+      'remove' => array(
+        'FORM element iD!' => '', // ??? need to say a value to put into the removed item.
+        // fixed? from other element? from submission result? callback!!
+      ),
+      'inject elements' => array( // set of injections for this
+        'project' => array(
+          'after' => '',
+          'weight' => 10,
+          // @todo: allows description, etc. basically, make this array formAPI-style data
+          'elements' => array('title'),
+          // @todo: specify callback to alter these elements,
+          //  eg for image attach, 'title' becomes 'Image title'.
         ),
       ),
     ),
