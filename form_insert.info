@@ -1,4 +1,4 @@
 ; $Id$
-name = Field_inject
-description = TODO: Description of module
+name = Form insert API
+description = Insert fields from one form into another and submit both.
 core = 6.x
