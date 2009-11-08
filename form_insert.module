@@ -11,7 +11,17 @@
  *  - CiviCRM-style collection of user data in other forms.
  *
  * How it works:
+ *  - A data structure tells the framework about different insertions.
+ *  - hook_form_alter gets the donor form, catches itself in the act (so to speak) and extracts the form elements it's been told to get
+ *  - these are safely re-keyed, inserted into the recipient form
+ *  - @todo on submit, the donor form is submitted programmatically, with options to:
+ *    - @todo set values on the donor form based on the recipient values (eg, donor takes node title from the recipient)
+ *    - @todo set values on the recipient form based on the submitting of the donor (eg, recipient's noderef takes the nid of the donor's resulting node)
  *
+ * Some potential applications:
+ *  - a generalized image_attach module build on top of CCK noderef
+ *  - a CiviCRM-style capturing of profile data in signup forms
+ *  - just generally being on crack
  *
  * Some terminology: 
  *  - donor form: the form whose elements are being inserted into another form
