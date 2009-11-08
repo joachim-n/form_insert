@@ -69,15 +69,15 @@ function field_inject_menu() {
  * is done, and we can now get the donor elements from the static variable.
  */
 function field_inject_form_alter(&$form, $form_state, $form_id) {
-  dsm("HFA: $form_id ====================");
+  //dsm("HFA: $form_id ====================");
 
+  // Static variables: these allow us to detect the second time we come here
+  // when we are altering the donor form.
   static $donor_forms_data = array();
   static $donor_form    = array();
-  // This allows us to detect the second time we come here when we are altering
-  // the donor form.
-  
-  dsm("2nd pass checks: $form_id");
-  dsm($donor_forms_data, 'donor forms');
+ 
+  //dsm("2nd pass checks: $form_id");
+  //dsm($donor_forms_data, 'donor forms');
   //dsm("static: $injected_form"); // works!
   //dsm("FOO: $foo");
   
@@ -87,7 +87,7 @@ function field_inject_form_alter(&$form, $form_state, $form_id) {
   if (isset($donor_forms_data[$form_id])) {
     // 2nd time around for this injection:
     // we are altering the donor form
-    dsm('2nd pass');
+    //dsm('2nd pass');
     // Build up the parts we want to inject, stash them in the $form and get out of here
     // so we return to the 1st pass.
     $donor_form = field_inject_form_alter_donor_form($form, $form_state, $form_id, $donor_forms_data[$form_id]);
@@ -96,13 +96,14 @@ function field_inject_form_alter(&$form, $form_state, $form_id) {
     // then 
   }
   
+  // Get information about insertions.
   $injections = field_inject_injections();
   // @todo stash title! forms try to change it!
   foreach ($injections as $id => $injection) {
     if (in_array($form_id, $injection['recipient forms'])) {
-      dsm("inject: $form_id - $id ============="); 
-      dsm($injection);
-      dsm($form);
+      //dsm("inject: $form_id - $id ============="); 
+      //dsm($injection);
+      //dsm($form);
       
       //$injected_form = 'WIBBLE';
       //$foo = 'FOO!';
@@ -112,7 +113,7 @@ function field_inject_form_alter(&$form, $form_state, $form_id) {
       $injection['id'] = $id;
       $donor_forms_data[$injection['donor form id']] = $injection;
       
-      dsm($donor_forms_data);
+      //dsm($donor_forms_data);
       
       // Call the form to embed
       // This sets in motion a whole new form building process which includes
@@ -123,6 +124,14 @@ function field_inject_form_alter(&$form, $form_state, $form_id) {
       // These are in weighted fieldsets.
       // Inject the form element fieldsets into the recipient form.
       $form = array_merge($form, $donor_form);
+      // Store the donor form details in a way we can get them back on validate or submit.
+      // We don't know how many times we get here, so use the line by line syntax
+      // to prevent clobbering.
+      $form['field_inject']['#type'] = 'value';
+      $form['field_inject']['#value'][$id] = $donor_form['donor form']['#value'];
+      // Unset the donor form data now we've stashed it cleanly.
+      unset($form['donor form']);
+      
       // Clear the static in case there are subsequent injections for this recipient.
       $donor_form = array();
      
@@ -145,20 +154,24 @@ function field_inject_form_alter(&$form, $form_state, $form_id) {
  * We come here from the second pass at hook_form_alter, when we are altering
  * the donor form. This gives us access to its structure array, which we plunder
  * for the bits we need.
+ *
+ * @param $form
+ *  The fully built donor form we want to extract elements from.
  */
 function field_inject_form_alter_donor_form(&$form, $form_state, $form_id, $injection) {
   // need the injection data here!
-  dsm($form);
-  dsm($injection);
+  //dsm($form);
+  //dsm($injection);
   
   $donor_form = array();
   // Iterate over several sets of injections
   foreach ($injection['donor elements'] as $id => $donor_elements_set) {
     // Create a safe key (we hope!) to prevent clobbering in the recipient form.
     $donor_form_base_key = $injection['id'] . '_' . $id;
+    // Create the fieldset for this set of insertions.
     $donor_form[$donor_form_base_key] = array(
       '#type' => 'fieldset',
-      // todo: nice programmatic way of getting these in with defaults if not set by settings
+      // @todo: nice programmatic way of getting these in with defaults if not set by settings
       '#title' => $donor_elements_set['#title'],
       '#weight' => $donor_elements_set['#weight'],
       '#tree' => TRUE,
@@ -170,19 +183,23 @@ function field_inject_form_alter_donor_form(&$form, $form_state, $form_id, $inje
         '#type' => 'value', 
         '#value' => array('bar'),
       ),
-      'donor form' => array(
-        '#type' => 'value', 
-        '#value' => $form,
-      ),
     );
     // Iterate over the elements we have to inject.
     foreach ($donor_elements_set['elements'] as $element_id) {
-      dsm("donor element id: $element_id");
+      //dsm("donor element id: $element_id");
       //dsm($form[$element_id]);
-      $donor_form[$donor_form_base_key][$donor_form_base_key . '_' . $element_id] = $form[$element_id];
-      // @todo altering callback
+      $donor_element_id = $donor_form_base_key . '_' . $element_id;
+      $donor_form[$donor_form_base_key][$donor_element_id] = $form[$element_id];
+      $donor_form[$donor_form_base_key][$donor_element_id]['#default_value'] = 'wigsticks';
+      // @todo altering callback, to put in default values among other things!
     }
   }
+  // Stash the original form here where the first-pass hook_form_alter() can
+  // retrieve it.
+  $donor_form['donor form'] = array(
+    '#type' => 'value', 
+    '#value' => $form,
+  );
   
   //dsm($donor_form);
   
@@ -200,8 +217,8 @@ function field_inject_form_alter_donor_form(&$form, $form_state, $form_id, $inje
  */
 function field_inject_injection_validate($element, &$form_state) {
   // For now, just return, as the basic case #required is handled.
-  dsm($element);
-  dsm($form_state);
+  //dsm($element);
+  //dsm($form_state);
   return;
 
   dsm('our validate');
@@ -219,14 +236,43 @@ function field_inject_injection_validate($element, &$form_state) {
   //  - merge with our stash and re-set them all
 }
 
-function field_inject_injection_submit($element, &$form_state) {
+function field_inject_injection_submit($form, &$form_state) {
   dsm('our submit');
-  dsm(form_get_errors());
-  dsm($element);
+  //dsm(form_get_errors());
+  //dsm($element);
   dsm($form_state);  
+
+  // Get information about insertions.
+  $injections = field_inject_injections();
+
+  // Create an artificial form state to pass to drupal_execute().
+  $donor_form_state = array();
+  $donor_form_state['values']['name'] = 'robo-user';
+
+  
+  foreach ($form_state['values']['field_inject'] as $id => $current_insertion) {
+    // drupal_execute('user_register', $form_state);
+    $donor_form_id = $injections[$id];
+    
+    foreach ($injections[$id]['donor elements'] as $group_id => $element_group) {
+      foreach ($element_group['elements'] as $field_name) {
+        // Get the values of the prefixed elements back out and into the artificial form state.
+        $recipient_element_key = $id . '_' . $group_id . '_' . $field_name;
+        $donor_form_state['values'][$field_name] = $form_state['values'][$id . '_' . $group_id][$recipient_element_key];
+      }
+      
+    }
+    
+    
+  }
+  
+  dsm($donor_form_state);
+  
+  
+  //print_r($element);
   
   // need to:
-  // get hold of the donor form somehow
+  // get hold of the donor form somehow (we have it stashed! but how do we know it's ours?)
   // insert defaults or calculated values
   // translate our form values into the original names
   // build a form state
@@ -243,6 +289,7 @@ function field_inject_injections() {
   $data = array(
     // An injection set: things from one form to be donor in another (or
     // several).
+    /*
     'image_attach' => array( // unique key, prefix with your module name for safety!
       'recipient forms' => array('story_node_form'), // array of form IDs
       // nope, needs to be callback to hit all node forms, say!
@@ -268,6 +315,7 @@ function field_inject_injections() {
         ),
       ),
     ),
+    */
     'cck_noderef' => array( // unique key, prefix with your module name for safety!
       'recipient forms' => array('story_node_form'), // array of form IDs
       // nope, needs to be callback to hit all node forms, say!
@@ -285,7 +333,7 @@ function field_inject_injections() {
       'donor elements' => array( // set of injections for this
         'project' => array(
           '#title' => 'Related grouping',
-          '#weight' => 10,
+          '#weight' => -10,
           'after' => '',
           // @todo: allows description, etc. basically, make this array formAPI-style data
           'elements' => array('title'),
