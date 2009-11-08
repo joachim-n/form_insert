@@ -251,7 +251,6 @@ function field_inject_injection_submit($form, &$form_state) {
 
   
   foreach ($form_state['values']['field_inject'] as $id => $current_insertion) {
-    // drupal_execute('user_register', $form_state);
     $donor_form_id = $injections[$id];
     
     foreach ($injections[$id]['donor elements'] as $group_id => $element_group) {
@@ -260,13 +259,12 @@ function field_inject_injection_submit($form, &$form_state) {
         $recipient_element_key = $id . '_' . $group_id . '_' . $field_name;
         $donor_form_state['values'][$field_name] = $form_state['values'][$id . '_' . $group_id][$recipient_element_key];
       }
-      
     }
-    
-    
   }
   
   dsm($donor_form_state);
+  // wont work for nodes! need node object too!
+  //drupal_execute($donor_form_id, $donor_form_state);
   
   
   //print_r($element);
